@@ -89,6 +89,8 @@ python tools/export_label.py --data_path Test/ --ckpt voxelnext_nuscenes_kernel1
 bash scripts/dist_train.sh NUM_GPUS --cfg_file PATH_TO_CONFIG_FILE
 #For example,
 bash scripts/dist_train.sh 8 --cfg_file PATH_TO_CONFIG_FILE
+#Training
+torchrun --nproc_per_node=1 tools/train.py --launcher pytorch --cfg_file tools/cfgs/custom_models/second.yaml 
 ```
 
 ## Citation 
