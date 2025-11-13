@@ -73,6 +73,14 @@ bash scripts/dist_test.sh NUM_GPUS --cfg_file PATH_TO_CONFIG_FILE --ckpt PATH_TO
 #For example,
 bash scripts/dist_test.sh 8 --cfg_file PATH_TO_CONFIG_FILE --ckpt PATH_TO_MODEL
 ```
+### Create and Inder
+
+```shell
+#Create pkl dataset
+python -m pcdet.datasets.custom.custom_dataset create_custom_infos tools/cfgs/dataset_configs/custom_dataset.yaml
+#Inference
+python tools/export_label.py --data_path Test/ --ckpt voxelnext_nuscenes_kernel1.pth --cfg_file tools/cfgs/nuscenes_models/cbgs_voxel0075_voxelnext.yaml --ext .bin --output_dir output_results
+```
 
 
 ### Training
