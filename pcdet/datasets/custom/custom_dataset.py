@@ -317,17 +317,20 @@ class CustomDataset(DatasetTemplate):
         self.map_class_to_kitti = self.dataset_cfg.MAP_CLASS_TO_KITTI
 
 
-    def set_split(self, split):
-        super().__init__(
-            dataset_cfg=self.dataset_cfg, class_names=self.class_names, training=self.training,
-            root_path=self.root_path, logger=self.logger
-        )
-        self.split = split
+    # def set_split(self, split):
+    #     super().__init__(
+    #         dataset_cfg=self.dataset_cfg, class_names=self.class_names, training=self.training,
+    #         root_path=self.root_path, logger=self.logger
+    #     )
+    #     self.split = split
 
-        # FIXED: Use Path instead of os.path.join
+    #     # FIXED: Use Path instead of os.path.join
+    #     split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
+    #     self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
+    def set_split(self, split):
+        self.split = split
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
         self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
-
     def include_data(self, mode):
         self.logger.info('Loading Custom dataset.')
         custom_infos = []
@@ -614,3 +617,4 @@ if __name__ == '__main__':
             data_path=data_path,
             save_path=data_path,
         )
+
