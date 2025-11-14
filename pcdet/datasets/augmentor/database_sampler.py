@@ -390,13 +390,32 @@ class DataBaseSampler(object):
                 start_offset, end_offset = info['global_data_offset']
                 obj_points = copy.deepcopy(gt_database_data[start_offset:end_offset])
             else:
-                file_path = self.root_path / info['path']
-
-                obj_points = np.fromfile(str(file_path), dtype=np.float32).reshape(
+                # Debug: Print types and values
+                print(f"\n=== Debug info ===")
+                print(f"self.root_path type: {type(self.root_path)}")
+                print(f"self.root_path value: {self.root_path}")
+                print(f"info['path'] type: {type(info['path'])}")
+                print(f"info['path'] value: {info['path']}")
+                
+                # Force convert to pure string
+                root_str = str(self.root_path) if self.root_path is not None else ''
+                path_str = str(info['path']) if info['path'] is not None else ''
+                
+                # Build path using string concatenation
+                import os
+                file_path = os.path.normpath(os.path.join(root_str, path_str))
+                
+                print(f"file_path type: {type(file_path)}")
+                print(f"file_path value: {file_path}")
+                print(f"file exists: {os.path.exists(file_path)}")
+                print(f"=================\n")
+                
+                # Load using pure string
+                obj_points = np.fromfile(file_path, dtype=np.float32).reshape(
                     [-1, self.sampler_cfg.NUM_POINT_FEATURES])
                 if obj_points.shape[0] != info['num_points_in_gt']:
-                    obj_points = np.fromfile(str(file_path), dtype=np.float64).reshape(-1, self.sampler_cfg.NUM_POINT_FEATURES)
-
+                    obj_points = np.fromfile(file_path, dtype=np.float64).reshape(
+                        [-1, self.sampler_cfg.NUM_POINT_FEATURES])
             assert obj_points.shape[0] == info['num_points_in_gt']
             obj_points[:, :3] += info['box3d_lidar'][:3].astype(np.float32)
 
