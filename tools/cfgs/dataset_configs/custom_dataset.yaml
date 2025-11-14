@@ -1,7 +1,7 @@
 DATASET: 'CustomDataset'
 DATA_PATH: '/home/ducanh/HoangNT/VoxelNeXt/PCDet'
 
-POINT_CLOUD_RANGE: [0, -70, -55, 160, 70, 5]
+POINT_CLOUD_RANGE: [-75.2, -75.2, -2, 75.2, 75.2, 4]
 
 MAP_CLASS_TO_KITTI: {
     'Car': 'Car',
@@ -25,6 +25,7 @@ POINT_FEATURE_ENCODING: {
 
 DATA_AUGMENTOR:
     DISABLE_AUG_LIST: ['placeholder']
+    DISABLE_AUG_LIST: ['gt_sampling']
     AUG_CONFIG_LIST:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
@@ -58,7 +59,7 @@ DATA_PROCESSOR:
         'test': False
 
     - NAME: transform_points_to_voxels
-      VOXEL_SIZE: [0.2, 0.2, 0.2] 
+      VOXEL_SIZE: [0.1, 0.1, 0.15]
       MAX_POINTS_PER_VOXEL: 5
       MAX_NUMBER_OF_VOXELS:
         'train': 150000
