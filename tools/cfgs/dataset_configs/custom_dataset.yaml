@@ -1,7 +1,7 @@
 DATASET: 'CustomDataset'
 DATA_PATH: '/home/ducanh/HoangNT/VoxelNeXt/PCDet'
 
-POINT_CLOUD_RANGE: [-75.2, -75.2, -2, 75.2, 75.2, 4]
+POINT_CLOUD_RANGE: [0, -70, -55, 160, 70, 5]
 
 MAP_CLASS_TO_KITTI: {
     'Car': 'Car',
@@ -30,16 +30,6 @@ DATA_AUGMENTOR:
           USE_ROAD_PLANE: False
           DB_INFO_PATH: 
               - custom_dbinfos_train.pkl
-          DB_DATA_PATH:
-              - gt_database
-          
-          # Add BACKUP_DB_INFO with all required fields
-          BACKUP_DB_INFO:
-              DB_INFO_PATH: custom_dbinfos_train.pkl
-              DB_DATA_PATH: gt_database
-              NUM_POINT_FEATURES: 4
-              RATE: 1.0
-                        
           PREPARE: {
              filter_by_min_points: ['Car:5'],
           }
@@ -68,7 +58,7 @@ DATA_PROCESSOR:
         'test': False
 
     - NAME: transform_points_to_voxels
-      VOXEL_SIZE: [0.1, 0.1, 0.15]
+      VOXEL_SIZE: [0.2, 0.2, 0.2] 
       MAX_POINTS_PER_VOXEL: 5
       MAX_NUMBER_OF_VOXELS:
         'train': 150000
