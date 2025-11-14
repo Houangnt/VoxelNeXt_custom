@@ -308,39 +308,52 @@ class CustomDataset(DatasetTemplate):
         )
         self.split = self.dataset_cfg.DATA_SPLIT[self.mode]
 
-        # FIXED: Use Path instead of os.path.join
+        # Ensure root_path is properly set
+        if self.root_path is None:
+            self.root_path = Path(self.dataset_cfg.DATA_PATH)
+        else:
+            self.root_path = Path(self.root_path)
+            
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
-        self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
+        
+        if not split_dir.exists():
+            raise FileNotFoundError(f"Split file not found: {split_dir}\nPlease check your data path and ImageSets folder")
+            
+        self.sample_id_list = [x.strip() for x in open(str(split_dir)).readlines()]
+        
+        if not self.sample_id_list:
+            raise ValueError(f"Empty sample list in {split_dir}")
+        
+        print(f"Loaded {len(self.sample_id_list)} samples from {split_dir}")
 
         self.custom_infos = []
         self.include_data(self.mode)
         self.map_class_to_kitti = self.dataset_cfg.MAP_CLASS_TO_KITTI
 
-
-    # def set_split(self, split):
-    #     super().__init__(
-    #         dataset_cfg=self.dataset_cfg, class_names=self.class_names, training=self.training,
-    #         root_path=self.root_path, logger=self.logger
-    #     )
-    #     self.split = split
-
-    #     # FIXED: Use Path instead of os.path.join
-    #     split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
-    #     self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
     def set_split(self, split):
         self.split = split
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
-        self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
+        
+        if not split_dir.exists():
+            raise FileNotFoundError(f"Split file not found: {split_dir}")
+            
+        self.sample_id_list = [x.strip() for x in open(str(split_dir)).readlines()]
+        
+        if not self.sample_id_list:
+            raise ValueError(f"Empty sample list in {split_dir}")
+            
+        print(f"Set split to '{split}': {len(self.sample_id_list)} samples")
+
     def include_data(self, mode):
         self.logger.info('Loading Custom dataset.')
         custom_infos = []
 
         for info_path in self.dataset_cfg.INFO_PATH[mode]:
-            info_path = self.root_path / info_path
+            info_path = Path(self.root_path) / info_path  # Ensure Path object
             if not info_path.exists():
                 self.logger.info(f'Info file not found (will be created): {info_path}')
                 continue
-            with open(info_path, 'rb') as f:
+            with open(str(info_path), 'rb') as f:  # Convert to string for open()
                 infos = pickle.load(f)
                 custom_infos.extend(infos)
 
@@ -352,8 +365,15 @@ class CustomDataset(DatasetTemplate):
         Read label file with format: x y z length width height rotation_yaw class_name
         Returns: gt_boxes (N, 7) array and gt_names array
         """
-        label_file = self.root_path / 'labels' / ('%s.txt' % idx)
-        assert label_file.exists(), f"Label file not found: {label_file}"
+        # Ensure idx is string
+        idx_str = str(idx)
+        
+        # Use os.path for safer path operations
+        import os
+        label_file = os.path.join(str(self.root_path), 'labels', f'{idx_str}.txt')
+        
+        if not os.path.exists(label_file):
+            raise FileNotFoundError(f"Label file not found: {label_file}")
         
         with open(label_file, 'r') as f:
             lines = f.readlines()
@@ -367,7 +387,6 @@ class CustomDataset(DatasetTemplate):
                 continue
                 
             if len(line_list) == 8:
-                # Format: x y z l w h ry class_name
                 try:
                     x, y, z, l, w, h, ry = [float(val) for val in line_list[:7]]
                     class_name = line_list[7]
@@ -386,34 +405,35 @@ class CustomDataset(DatasetTemplate):
         return np.array(gt_boxes, dtype=np.float32), np.array(gt_names)
 
     def get_lidar(self, idx):
-        # Try .bin first, then .npy
-        lidar_file_bin = self.root_path / 'points' / ('%s.bin' % idx)
-        lidar_file_npy = self.root_path / 'points' / ('%s.npy' % idx)
+        # Convert idx to string if needed
+        idx_str = str(idx)
         
-        if lidar_file_bin.exists():
-            # Read .bin file (typical format: N x 4, where 4 = x,y,z,intensity)
+        # Debug: Check root_path type
+        if not isinstance(self.root_path, (str, Path)):
+            print(f"ERROR: root_path has wrong type: {type(self.root_path)}, value: {self.root_path}")
+            raise TypeError(f"root_path must be string or Path, got {type(self.root_path)}")
+        
+        # Ensure root_path is Path object
+        root = Path(self.root_path) if isinstance(self.root_path, str) else self.root_path
+        
+        # Build paths using string operations to avoid pathlib recursion
+        lidar_file_bin = root / 'points' / f'{idx_str}.bin'
+        lidar_file_npy = root / 'points' / f'{idx_str}.npy'
+        
+        # Use os.path.exists instead of Path.exists() to avoid recursion
+        import os
+        if os.path.exists(str(lidar_file_bin)):
             point_features = np.fromfile(str(lidar_file_bin), dtype=np.float32).reshape(-1, 4)
-        elif lidar_file_npy.exists():
+        elif os.path.exists(str(lidar_file_npy)):
             point_features = np.load(str(lidar_file_npy))
         else:
             raise FileNotFoundError(f"Point cloud file not found: {lidar_file_bin} or {lidar_file_npy}")
             
         return point_features
 
-    def set_split(self, split):
-        super().__init__(
-            dataset_cfg=self.dataset_cfg, class_names=self.class_names, training=self.training,
-            root_path=self.root_path, logger=self.logger
-        )
-        self.split = split
-
-        split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
-        self.sample_id_list = [x.strip() for x in open(split_dir).readlines()] if split_dir.exists() else None
-
     def __len__(self):
         if self._merge_all_iters_to_one_epoch:
             return len(self.sample_id_list) * self.total_epochs
-
         return len(self.custom_infos)
 
     def __getitem__(self, index):
@@ -422,9 +442,19 @@ class CustomDataset(DatasetTemplate):
 
         info = copy.deepcopy(self.custom_infos[index])
         sample_idx = info['point_cloud']['lidar_idx']
-        points = self.get_lidar(sample_idx)
+        
+        # Debug logging
+        try:
+            points = self.get_lidar(sample_idx)
+        except Exception as e:
+            print(f"\nERROR in __getitem__ at index {index}:")
+            print(f"  sample_idx: {sample_idx}, type: {type(sample_idx)}")
+            print(f"  root_path: {self.root_path}, type: {type(self.root_path)}")
+            print(f"  Exception: {e}")
+            raise
+            
         input_dict = {
-            'frame_id': self.sample_id_list[index],
+            'frame_id': str(sample_idx),  # Ensure string
             'points': points
         }
 
@@ -439,7 +469,6 @@ class CustomDataset(DatasetTemplate):
             })
 
         data_dict = self.prepare_data(data_dict=input_dict)
-
         return data_dict
 
     def evaluation(self, det_annos, class_names, **kwargs):
@@ -475,14 +504,16 @@ class CustomDataset(DatasetTemplate):
         import concurrent.futures as futures
 
         def process_single_scene(sample_idx):
-            print('%s sample_idx: %s' % (self.split, sample_idx))
+            # Ensure sample_idx is string, not Path
+            sample_idx_str = str(sample_idx)
+            print('%s sample_idx: %s' % (self.split, sample_idx_str))
             info = {}
-            pc_info = {'num_features': num_features, 'lidar_idx': sample_idx}
+            pc_info = {'num_features': num_features, 'lidar_idx': sample_idx_str}  # Save as string
             info['point_cloud'] = pc_info
 
             if has_label:
                 annotations = {}
-                gt_boxes_lidar, name = self.get_label(sample_idx)
+                gt_boxes_lidar, name = self.get_label(sample_idx_str)
                 annotations['name'] = name
                 annotations['gt_boxes_lidar'] = gt_boxes_lidar[:, :7]
                 info['annos'] = annotations
@@ -491,7 +522,6 @@ class CustomDataset(DatasetTemplate):
 
         sample_id_list = sample_id_list if sample_id_list is not None else self.sample_id_list
 
-        # create a thread pool to improve the velocity
         with futures.ThreadPoolExecutor(num_workers) as executor:
             infos = executor.map(process_single_scene, sample_id_list)
         return list(infos)
@@ -505,7 +535,7 @@ class CustomDataset(DatasetTemplate):
         database_save_path.mkdir(parents=True, exist_ok=True)
         all_db_infos = {}
 
-        with open(info_path, 'rb') as f:
+        with open(str(info_path), 'rb') as f:
             infos = pickle.load(f)
 
         for k in range(len(infos)):
@@ -520,7 +550,7 @@ class CustomDataset(DatasetTemplate):
             num_obj = gt_boxes.shape[0]
             point_indices = roiaware_pool3d_utils.points_in_boxes_cpu(
                 torch.from_numpy(points[:, 0:3]), torch.from_numpy(gt_boxes)
-            ).numpy()  # (nboxes, npoints)
+            ).numpy()
 
             for i in range(num_obj):
                 filename = '%s_%s_%d.bin' % (sample_idx, names[i], i)
@@ -528,11 +558,11 @@ class CustomDataset(DatasetTemplate):
                 gt_points = points[point_indices[i] > 0]
 
                 gt_points[:, :3] -= gt_boxes[i, :3]
-                with open(filepath, 'w') as f:
+                with open(str(filepath), 'wb') as f:  # Use 'wb' instead of 'w'
                     gt_points.tofile(f)
 
                 if (used_classes is None) or names[i] in used_classes:
-                    db_path = str(filepath.relative_to(self.root_path))  # gt_database/xxxxx.bin
+                    db_path = str(filepath.relative_to(self.root_path))
                     db_info = {'name': names[i], 'path': db_path, 'gt_idx': i,
                                'box3d_lidar': gt_boxes[i], 'num_points_in_gt': gt_points.shape[0]}
                     if names[i] in all_db_infos:
@@ -540,16 +570,15 @@ class CustomDataset(DatasetTemplate):
                     else:
                         all_db_infos[names[i]] = [db_info]
 
-        # Output the num of all classes in database
         for k, v in all_db_infos.items():
             print('Database %s: %d' % (k, len(v)))
 
-        with open(db_info_save_path, 'wb') as f:
+        with open(str(db_info_save_path), 'wb') as f:
             pickle.dump(all_db_infos, f)
 
     @staticmethod
     def create_label_file_with_name_and_box(class_names, gt_names, gt_boxes, save_label_path):
-        with open(save_label_path, 'w') as f:
+        with open(str(save_label_path), 'w') as f:
             for idx in range(gt_boxes.shape[0]):
                 boxes = gt_boxes[idx]
                 name = gt_names[idx]
@@ -563,6 +592,23 @@ class CustomDataset(DatasetTemplate):
 
 
 def create_custom_infos(dataset_cfg, class_names, data_path, save_path, workers=4):
+    # Ensure paths are Path objects
+    data_path = Path(data_path)
+    save_path = Path(save_path)
+    
+    print(f"Data path: {data_path}")
+    print(f"Save path: {save_path}")
+    
+    # Verify data structure
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data path does not exist: {data_path}")
+    
+    required_dirs = ['ImageSets', 'labels', 'points']
+    for dir_name in required_dirs:
+        dir_path = data_path / dir_name
+        if not dir_path.exists():
+            raise FileNotFoundError(f"Required directory not found: {dir_path}")
+    
     dataset = CustomDataset(
         dataset_cfg=dataset_cfg, class_names=class_names, root_path=data_path,
         training=False, logger=common_utils.create_logger()
@@ -579,7 +625,7 @@ def create_custom_infos(dataset_cfg, class_names, data_path, save_path, workers=
     custom_infos_train = dataset.get_infos(
         class_names, num_workers=workers, has_label=True, num_features=num_features
     )
-    with open(train_filename, 'wb') as f:
+    with open(str(train_filename), 'wb') as f:
         pickle.dump(custom_infos_train, f)
     print('Custom info train file is saved to %s' % train_filename)
 
@@ -587,13 +633,13 @@ def create_custom_infos(dataset_cfg, class_names, data_path, save_path, workers=
     custom_infos_val = dataset.get_infos(
         class_names, num_workers=workers, has_label=True, num_features=num_features
     )
-    with open(val_filename, 'wb') as f:
+    with open(str(val_filename), 'wb') as f:
         pickle.dump(custom_infos_val, f)
     print('Custom info val file is saved to %s' % val_filename)
 
     print('------------------------Start create groundtruth database for data augmentation------------------------')
     dataset.set_split(train_split)
-    dataset.create_groundtruth_database(train_filename, split=train_split)
+    dataset.create_groundtruth_database(str(train_filename), split=train_split)
     print('------------------------Data preparation done------------------------')
 
 
@@ -605,11 +651,30 @@ if __name__ == '__main__':
         from pathlib import Path
         from easydict import EasyDict
 
-        dataset_cfg = EasyDict(yaml.safe_load(open(sys.argv[2])))
-        ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+        # Load config
+        config_path = sys.argv[2]
+        print(f"Loading config from: {config_path}")
         
-        # Use the DATA_PATH from config file
-        data_path = ROOT_DIR / dataset_cfg.DATA_PATH if not Path(dataset_cfg.DATA_PATH).is_absolute() else Path(dataset_cfg.DATA_PATH)
+        dataset_cfg = EasyDict(yaml.safe_load(open(config_path)))
+        
+        # Get data path from config
+        if hasattr(dataset_cfg, 'DATA_PATH'):
+            data_path = Path(dataset_cfg.DATA_PATH)
+            print(f"Using DATA_PATH from config: {data_path}")
+        else:
+            # Fallback to default
+            ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+            data_path = ROOT_DIR / 'PCDet'
+            print(f"DATA_PATH not in config, using default: {data_path}")
+        
+        # Verify path exists
+        if not data_path.exists():
+            print(f"ERROR: Data path does not exist: {data_path}")
+            sys.exit(1)
+            
+        if not (data_path / 'ImageSets').exists():
+            print(f"ERROR: ImageSets folder not found in: {data_path}")
+            sys.exit(1)
         
         create_custom_infos(
             dataset_cfg=dataset_cfg,
@@ -617,4 +682,3 @@ if __name__ == '__main__':
             data_path=data_path,
             save_path=data_path,
         )
-
